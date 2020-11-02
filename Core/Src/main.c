@@ -56,32 +56,14 @@ float flux;
 float i;
 unsigned int ledcount=0;
 unsigned int displaymode=0;
-//uint8_t cite;cihu;cico;citv;cito;
 uint8_t sam[1];int bpflag=0;char char_buff1[6];char char_buff2[6];float T;
 char hrtime[],mintime[],sectime[];
 unsigned int workflag=0;
 
-
-
-uint32_t noise_val;
-int dbb=0;
-int diff;
-uint16_t mode=0;
-int s=0;
-int startp=59;
-int	prevx=16;
-int prevy=58;
-float xpos=14;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-void init_co2();
-void get_co2_voc();
-void get_temp_humi();
-void calculate_lux();
-void get_lux();
-void init_LightSensor();
 void DrawGraph(uint8_t i,uint8_t y);
 void DrawTempGraph(float i);
 float mapf(float val, float in_min, float in_max, float out_min, float out_max);
@@ -128,6 +110,7 @@ uint8_t decToBcd(int val)
 {
   return (uint8_t)( (val/10*16) + (val%10) );
 }
+
 // Convert binary coded decimal to normal decimal numbers
 int bcdToDec(uint8_t val)
 {
@@ -177,8 +160,67 @@ void Get_Time (void)
 
 void pir(void)
 {
-		HAL_GPIO_WritePin(GPIOA,GPIO_PIN_1,GPIO_PIN_RESET);
-		HAL_TIM_Base_Start_IT(&htim3);
+	HAL_GPIO_WritePin(GPIOA,GPIO_PIN_1,GPIO_PIN_RESET);
+	HAL_TIM_Base_Start_IT(&htim3);
+}
+
+void init_LightSensor()
+{
+	light_databuff[0] = 0x01;
+	light_databuff[1] = (0xCE10)>>8;
+	light_databuff[2] = (0xCE10)& 0x00FF;
+	HAL_I2C_Master_Transmit(&hi2c1,lux_address<<1,light_databuff,3,50);
+}
+
+void get_lux()
+{
+	data[0]=(0x00);
+	HAL_I2C_Master_Transmit(&hi2c1,lux_address<<1,data,1,50);
+	HAL_Delay(50);
+	HAL_I2C_Master_Receive(&hi2c1,lux_address<<1,readbuff,2,50);
+	rawlux=((readbuff[0] << 8) | readbuff[1]);
+}
+
+void calculate_lux()
+{
+	uint16_t iExponent, iMantissa;
+	iMantissa = rawlux & 0x0FFF;
+	iExponent = (rawlux & 0xF000) >> 12;
+	flux= iMantissa * (0.01 * powf(2, iExponent));
+}
+
+void init_co2()
+{
+	data[0] = (0x2003)>>8;
+	data[1] = (0x2003) & 0x00FF;
+	HAL_I2C_Master_Transmit(&hi2c1,co2sensor_address<<1,data,2,50);
+}
+
+void get_co2_voc()
+{
+	data[0] = (0x2008)>>8;
+	data[1] = (0x2008) & 0x00FF;
+	co2sensor_init = 0x2008;
+	HAL_I2C_Master_Transmit(&hi2c1,co2sensor_address<<1,data,2,50);
+	HAL_Delay(1000);
+	HAL_I2C_Master_Receive(&hi2c1,co2sensor_address<<1,readbuff,6,50);
+	co2 = (readbuff[0]<<8)|readbuff[1];
+	tvoc = (readbuff[3]<<8)|(readbuff[4]);
+}
+
+void get_temp_humi()
+{
+	HAL_Delay(50);
+	data[0] = 0x22; //command
+	data[1] = 0x36;
+	HAL_I2C_Master_Transmit(&hi2c1,thermal_address<<1,data,2,50);
+	HAL_Delay(50);
+	HAL_I2C_Master_Receive(&hi2c1,thermal_address<<1,readbuff,6,50);
+	temp = (readbuff[0] * 256) + readbuff[1];
+	cTemp = -45.0 + (175.0 * temp / 65535.0);
+	humi = (readbuff[3] * 256) + readbuff[4];
+	cHumi = (100.0 * humi / 65535.0);
+//	i = abs(25-cTemp);
 }
 /* USER CODE END 0 */
 
@@ -262,7 +304,7 @@ int main(void)
 		 sprintf(char_buff2,"%.2f",cHumi);
 		SSD1306_Puts(char_buff2, &Font_7x10, SSD1306_COLOR_WHITE);
 	    SSD1306_UpdateScreen();
-//      /////////////////////////////////////////////////////////////////////////////////co2 and tvoc
+      /////////////////////////////////////////////////////////////////////////////////co2 and tvoc
 	    get_co2_voc();
 		 SSD1306_GotoXY(42,22);
 		 sprintf(char_buff1,"%.2f",co2);
@@ -273,7 +315,7 @@ int main(void)
 		 sprintf(char_buff2,"%.2f",tvoc);
 		SSD1306_Puts(char_buff2, &Font_7x10, SSD1306_COLOR_WHITE);
 	    SSD1306_UpdateScreen();
-//	 ///////////////////////////////////////////////////////////////////////////////////Ambient light
+	 ///////////////////////////////////////////////////////////////////////////////////Ambient light
 		  get_lux();
 		  calculate_lux();
 		  SSD1306_GotoXY(42,42);
@@ -305,65 +347,9 @@ int main(void)
 }
 
 
-void init_LightSensor()
-{
-	  light_databuff[0]=0x01;
-	  light_databuff[1]=(0xCE10)>>8;
-	  light_databuff[2]=(0xCE10)& 0x00FF;
-	  HAL_I2C_Master_Transmit(&hi2c1,lux_address<<1,light_databuff,3,50);
-}
 
-void get_lux()
-{
-	data[0]=(0x00);
-	HAL_I2C_Master_Transmit(&hi2c1,lux_address<<1,data,1,50);
-	HAL_Delay(50);
-	HAL_I2C_Master_Receive(&hi2c1,lux_address<<1,readbuff,2,50);
-	rawlux=((readbuff[0] << 8) | readbuff[1]);
-}
 
-void calculate_lux()
-{
-	 uint16_t iExponent, iMantissa;
-	  iMantissa = rawlux & 0x0FFF;
-	  iExponent = (rawlux & 0xF000) >> 12;
-	  flux= iMantissa * (0.01 * powf(2, iExponent));
-}
 
-void init_co2()
-{
-data[0]=(0x2003)>>8;
-data[1]=(0x2003) & 0x00FF;
-HAL_I2C_Master_Transmit(&hi2c1,co2sensor_address<<1,data,2,50);
-}
-
-void get_co2_voc()
-{
-	data[0]=(0x2008)>>8;
-	data[1]=(0x2008) & 0x00FF;
-	co2sensor_init=0x2008;
-	HAL_I2C_Master_Transmit(&hi2c1,co2sensor_address<<1,data,2,50);
-	HAL_Delay(1000);
-	HAL_I2C_Master_Receive(&hi2c1,co2sensor_address<<1,readbuff,6,50);
-	co2 = (readbuff[0]<<8)|readbuff[1];
-	tvoc=(readbuff[3]<<8)|(readbuff[4]);
-}
-
-void get_temp_humi()
-{
-	HAL_Delay(50);
-	data[0]=0x22; //command
-	data[1]=0x36;
-	HAL_I2C_Master_Transmit(&hi2c1,thermal_address<<1,data,2,50);
-	HAL_Delay(50);
-	HAL_I2C_Master_Receive(&hi2c1,thermal_address<<1,readbuff,6,50);
-	 temp = (readbuff[0] * 256) + readbuff[1];
-	 cTemp = -45.0 + (175.0 * temp / 65535.0);
-	 humi = (readbuff[3] * 256) + readbuff[4];
-	 cHumi = (100.0 * humi / 65535.0);
-	 i=abs(25-cTemp);
-
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

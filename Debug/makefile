@@ -15,6 +15,12 @@ RM := rm -rf
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(strip $(S_DEPS)),)
+-include $(S_DEPS)
+endif
+ifneq ($(strip $(S_UPPER_DEPS)),)
+-include $(S_UPPER_DEPS)
+endif
 ifneq ($(strip $(C_DEPS)),)
 -include $(C_DEPS)
 endif
@@ -40,8 +46,8 @@ Environment_Monitor.bin \
 all: Environment_Monitor.elf secondary-outputs
 
 # Tool invocations
-Environment_Monitor.elf: $(OBJS) $(USER_OBJS) C:\Users\sanke\STM32CubeIDE\personal_workspace\Environment_Monitor\STM32F103C8TX_FLASH.ld
-	arm-none-eabi-gcc -o "Environment_Monitor.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"C:\Users\sanke\STM32CubeIDE\personal_workspace\Environment_Monitor\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Environment_Monitor.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
+Environment_Monitor.elf: $(OBJS) $(USER_OBJS) D:\Personal\ Projects\ and\ Files\github\ downloads\Environmental-Monitor-STM32F1\STM32F103C8TX_FLASH.ld
+	arm-none-eabi-gcc -o "Environment_Monitor.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"D:\Personal Projects and Files\github downloads\Environmental-Monitor-STM32F1\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Environment_Monitor.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
